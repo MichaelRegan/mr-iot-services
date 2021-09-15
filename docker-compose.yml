@@ -1,0 +1,94 @@
+version: '3.6'
+services:
+  # Tests the current internet connection speed
+  # once per hour and writes the results into an
+  # InfluxDB instance
+  # speedtest:    
+  #   image: robinmanuelthiel/speedtest:latest
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - influxdb
+  #   environment:
+  #     - LOOP=true
+  #     - LOOP_DELAY=3600 # Once per hour
+  #     - DB_SAVE=true
+  #     - DB_HOST=http://influxdb:8086
+  #     - DB_NAME=speedtest
+  #     - DB_USERNAME=admin
+  #     - DB_PASSWORD=<MY_PASSWORD>
+  speedtest:    
+    image: jraviles/prometheus_speedtest:latest
+    restart: unless-stopped
+    ports:
+      - 9516:9516/tcp
+    depends_on:
+      - prometheus
+    # environment:
+    #   - LOOP=true
+    #   - LOOP_DELAY=3600 # Once per hour
+    #   - DB_SAVE=true
+    #   - DB_HOST=http://influxdb:8086
+    #   - DB_NAME=speedtest
+    #   - DB_USERNAME=admin
+    #   - DB_PASSWORD=<MY_PASSWORD>
+
+  # Creates an InfluxDB instance to store the
+  # speed test results
+  influxdb:
+    image: influxdb:2.0
+    hostname: influx
+    domainname: mjsquared.net
+    environment:
+      - TZ=America/Los_Angeles
+      - DOCKER_INFLUXDB_INIT_USERNAME=mregan
+      - DOCKER_INFLUXDB_INIT_PASSWORD=test1234
+      - DOCKER_INFLUXDB_INIT_ORG=mjsquared
+      - DOCKER_INFLUXDB_INIT_BUCKET=mrbucket
+      - DOCKER_INFLUXDB_INIT_RETENTION=5y
+#      - INFLUXDB_DB=speedtest
+    volumes:
+      - influxdb2:/var/lib/influxdb2
+#      - influx_data:/var/lib/influxdb2
+      - influx_config:/etc/influxdb2
+    ports:
+#      - "8083:8083"
+      - "8086:8086"
+    restart: unless-stopped
+
+  # Displays the results in a Grafana dashborad
+  grafana:
+    image: grafana/grafana:8.1.2
+    restart: always
+    depends_on:
+      - influxdb
+    ports:
+      - 3000:3000
+    volumes:
+      - grafana:/var/lib/grafana
+
+  prometheus:
+    image: ubuntu/prometheus:2.25-21.04_beta
+    hostname: prometheus
+    domainname: mjsquared.net
+    restart: always
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    depends_on:
+      - influxdb
+    ports:
+      - 30090:9090
+    environment:
+      - TZ=America/Los_Angeles
+
+volumes:
+  grafana:
+  influxdb2:
+    driver: local
+    name: "influxdb2"
+#  influx_data:
+#    driver: local
+#    name: "influx_data"
+  influx_config:
+    driver: local
+    name: "influx_config"
+
